@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
 
@@ -51,7 +52,7 @@ namespace GameTools
         public int timerCount { get; private set; }
 
         private int _deltaTime = 10;
-
+        private bool _isAsync = true;
         private TimerManager()
         {
         }
@@ -73,7 +74,7 @@ namespace GameTools
 
             dirty = false;
             enable = true;
-
+            _isAsync = false;
             owner.StartCoroutine(DirtyCheckOnEndOfFrame());
         }
 
@@ -95,6 +96,7 @@ namespace GameTools
 
             dirty = false;
             enable = true;
+            _isAsync = true;
             Task.Run(DirtySortAsync);
         }
 
@@ -106,6 +108,35 @@ namespace GameTools
             _deltaTime = 10;
         }
 
+        /// <summary>
+        /// 更新函数
+        /// </summary>
+        public void Tick()
+        {
+            if (!enable || _runningTimerIdList.Count <= 0)
+            {
+                return;
+            }
+
+            int[] removeIdArray;
+            if (_isAsync)
+            {
+                lock (_timerQueue)
+                {
+                    TimerQueueExecute(out removeIdArray);
+                }
+            }
+            else
+            {
+                TimerQueueExecute(out removeIdArray);
+            }
+            
+            foreach (var tid in removeIdArray)
+            {
+                RemoveRunningTimer(tid, out _);
+            }
+        }
+        
         /// <summary>
         /// 新建毫秒计时器
         /// </summary>
@@ -144,7 +175,6 @@ namespace GameTools
             _timerDic.Add(newTimer.tId,newTimer);
             _readyTimerIdList.Add(newTimer.tId);
             
-            //_readyTimerDic.Add(newTimer.tId, newTimer);
             newTimer.Init(interval, loopAction, completeAction, loop, autoDestroy);
 
             return newTimer.tId;
@@ -319,41 +349,27 @@ namespace GameTools
             state = TimerState.Stop;
             return false;
         }
-        /// <summary>
-        /// 更新函数
-        /// </summary>
-        public void Tick()
+
+        private void TimerQueueExecute(out int[] stopIdTimers)
         {
-            if (!enable || _runningTimerIdList.Count <= 0)
+            List<int> stopTimerIdList = new List<int>();
+            foreach (var timer in _timerQueue)
             {
-                return;
-            }
-
-            List<int> _removeIdList = new List<int>();
-            lock (_timerQueue)
-            {
-                foreach (var timer in _timerQueue)
+                if (timer.GetLoopTimeRemaining() > 0)
                 {
-                    if (timer.GetLoopTimeRemaining() > 0)
-                    {
-                        break;
-                    }
+                    break;
+                }
 
-                    timer.Execute();
-                    dirty = true;
-                    if (timer.state == TimerState.Stop)
-                    {
-                        _removeIdList.Add(timer.tId);
-                    }
+                timer.Execute();
+                dirty = true;
+                if (timer.state == TimerState.Stop)
+                {
+                    stopTimerIdList.Add(timer.tId);
                 }
             }
-
-            foreach (var tid in _removeIdList)
-            {
-                RemoveRunningTimer(tid, out _);
-            }
+            stopIdTimers = stopTimerIdList.ToArray();
         }
-
+        
         private bool RemoveRunningTimer(int tId, out BaseTimer timer)
         {
             timer = null;
@@ -396,7 +412,15 @@ namespace GameTools
             }
 
             bufferTimerQueue.Sort((t1, t2) => t1.GetLoopTimeRemaining().CompareTo(t2.GetLoopTimeRemaining()));
-            lock (_timerQueue)
+            if (_isAsync)
+            {
+                lock (_timerQueue)
+                {
+                    _timerQueue.Clear();
+                    _timerQueue.AddRange(bufferTimerQueue);
+                }
+            }
+            else
             {
                 _timerQueue.Clear();
                 _timerQueue.AddRange(bufferTimerQueue);
