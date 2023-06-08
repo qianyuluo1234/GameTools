@@ -16,7 +16,7 @@
 
 　　计时器的所有行为均由TimerManager进行管理，TimerManager是一个单例类，相关使用方法请查看[Timer教程.md](./Assets/Document/Timer/Timer教程.md)。如需了解详情，请自行查看源码。目前该计时器暂不支持timeScale(没有做相关的实现，后续会去实现该功能，但时间不定)。
 
-### ２.ObjectPools
+### ２.ObjectPool
 
 ## 尾语
 
