@@ -18,6 +18,12 @@
 
 ### ２.ObjectPool
 
+          简单的对象池封装，支持Lua。建议自行创建维护一个Pool Id List来对所有的Pool使用与管理 
+
+### ３.GameInputController
+
+　　GameInputController是对Unity中Input系统的简单封装。将原本通过调用Input类实现的按键和轴行为包装成使用GameInputController类进行统一注册管理的事件系统。
+
 ## 尾语
 
 　　最后希望以上工具能对您的工作有小小的帮助。
